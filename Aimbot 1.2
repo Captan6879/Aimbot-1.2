@@ -1,0 +1,217 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- CONFIG
+local ESPColor = Color3.fromRGB(255, 0, 0)
+local AimbotEnabled = false
+local ESPEnabled = false
+local LineEnabled = false
+local XRayEnabled = false
+local TeamCheck = true
+local AimPart = "Head"
+local FOVRadius = 100 -- Default FOV size
+
+-- UI
+local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "AimbotMenu"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+
+local toggleButton = Instance.new("TextButton", screenGui)
+toggleButton.Size = UDim2.new(0, 120, 0, 40)
+toggleButton.Position = UDim2.new(1, -130, 0, 20)
+toggleButton.Text = "≡ MENU"
+toggleButton.Font = Enum.Font.GothamBlack
+toggleButton.TextSize = 16
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", toggleButton).Color = Color3.fromRGB(255, 65, 65)
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 400, 0, 340)
+mainFrame.Position = UDim2.new(1, -420, 0, 70)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.Visible = false
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+local mfStroke = Instance.new("UIStroke", mainFrame)
+mfStroke.Color = Color3.fromRGB(255, 0, 0)
+mfStroke.Thickness = 2
+
+local sidebar = Instance.new("Frame", mainFrame)
+sidebar.Size = UDim2.new(0, 150, 1, 0)
+sidebar.Position = UDim2.new(0, 0, 0, 0)
+sidebar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
+
+local layout = Instance.new("UIListLayout", sidebar)
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local padding = Instance.new("UIPadding", sidebar)
+padding.PaddingTop = UDim.new(0, 10)
+padding.PaddingLeft = UDim.new(0, 10)
+padding.PaddingRight = UDim.new(0, 10)
+
+local function makeButton(name, callback)
+local btn = Instance.new("TextButton", sidebar)
+btn.Size = UDim2.new(1, 0, 0, 32)
+btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+btn.Text = "• " .. name
+btn.Font = Enum.Font.GothamMedium
+btn.TextSize = 14
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.AutoButtonColor = true
+btn.Name = name:gsub(" ", "")
+btn.MouseButton1Click:Connect(callback)
+
+local corner = Instance.new("UICorner", btn)  
+corner.CornerRadius = UDim.new(0, 6)  
+
+local stroke = Instance.new("UIStroke", btn)  
+stroke.Color = Color3.fromRGB(100, 100, 100)  
+stroke.Thickness = 1
+
+end
+
+-- Buttons
+makeButton("Toggle Aimbot FOV", function() AimbotEnabled = not AimbotEnabled end)
+makeButton("Target Head / Body", function() AimPart = AimPart == "Head" and "HumanoidRootPart" or "Head" end)
+makeButton("Toggle ESP / Box", function() ESPEnabled = not ESPEnabled end)
+makeButton("Toggle Line", function() LineEnabled = not LineEnabled end)
+
+makeButton("Toggle X-Ray", function()
+XRayEnabled = not XRayEnabled
+for _, part in pairs(Workspace:GetDescendants()) do
+if part:IsA("BasePart") and part.Transparency < 1 then
+part.LocalTransparencyModifier = XRayEnabled and 0.5 or 0
+end
+end
+end)
+
+makeButton("Toggle WalkSpeed / Jump", function()
+local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local hum = char:FindFirstChildOfClass("Humanoid")
+if hum then
+hum.WalkSpeed = hum.WalkSpeed == 16 and 50 or 16
+hum.JumpPower = hum.JumpPower == 50 and 100 or 50
+end
+end)
+
+makeButton("Toggle Team Check", function() TeamCheck = not TeamCheck end)
+
+toggleButton.MouseButton1Click:Connect(function()
+mainFrame.Visible = not mainFrame.Visible
+end)
+
+-- ESP Functions
+local function createESP(target)
+local box = Drawing.new("Square")
+box.Color = ESPColor
+box.Thickness = 2
+box.Transparency = 1
+box.Filled = false
+
+local line = Drawing.new("Line")  
+line.Color = ESPColor  
+line.Thickness = 2  
+line.Transparency = 1  
+
+return {  
+	box = box,  
+	line = line,  
+	update = function()  
+		local char = target.Character  
+		if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then  
+			local hrp = char.HumanoidRootPart  
+			local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)  
+			if onScreen then  
+				local size = 50  
+				box.Size = Vector2.new(size, size * 1.6)  
+				box.Position = Vector2.new(pos.X - size / 2, pos.Y - size / 1.6)  
+				box.Visible = ESPEnabled  
+
+				line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)  
+				line.To = Vector2.new(pos.X, pos.Y)  
+				line.Visible = LineEnabled  
+			else  
+				box.Visible = false  
+				line.Visible = false  
+			end  
+		else  
+			box.Visible = false  
+			line.Visible = false  
+		end  
+	end  
+}
+
+end
+
+local espObjects = {}
+
+local function setupESPForPlayer(player)
+if player == LocalPlayer then return end
+local espObj = createESP(player)
+espObjects[player] = espObj
+end
+
+for _, player in pairs(Players:GetPlayers()) do
+setupESPForPlayer(player)
+end
+
+Players.PlayerAdded:Connect(setupESPForPlayer)
+
+-- Aimbot Target Finder
+local function getClosest()
+local closest = nil
+local shortest = math.huge
+for _, target in pairs(Players:GetPlayers()) do
+if target ~= LocalPlayer and target.Character and target.Character:FindFirstChild(AimPart) then
+if TeamCheck and target.Team == LocalPlayer.Team then continue end
+local pos, onScreen = Camera:WorldToViewportPoint(target.Character[AimPart].Position)
+if onScreen then
+local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+if dist < shortest and dist < FOVRadius then
+shortest = dist
+closest = target
+end
+end
+end
+end
+return closest
+end
+
+-- FOV Circle
+local fovCircle = Drawing.new("Circle")
+fovCircle.Color = Color3.fromRGB(255, 0, 0)
+fovCircle.Thickness = 2
+fovCircle.Transparency = 1
+fovCircle.Filled = false
+fovCircle.Radius = FOVRadius
+fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+fovCircle.Visible = AimbotEnabled
+fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+for _, espObj in pairs(espObjects) do  
+	espObj.update()  
+end  
+
+if AimbotEnabled then  
+	local target = getClosest()  
+	if target and target.Character and target.Character:FindFirstChild(AimPart) then  
+		local part = target.Character[AimPart]  
+		local direction = (part.Position - Camera.CFrame.Position).Unit  
+		Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + direction)  
+	end  
+end
+
+end)
+
