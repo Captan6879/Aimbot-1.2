@@ -1,6 +1,8 @@
+-- Services
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
@@ -12,7 +14,8 @@ local LineEnabled = false
 local XRayEnabled = false
 local TeamCheck = true
 local AimPart = "Head"
-local FOVRadius = 100 -- Default FOV size
+local FOVRadius = 100
+local LineTarget = "Center" -- "Head", "Torso", "Center"
 
 -- UI
 local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -20,6 +23,7 @@ screenGui.Name = "AimbotMenu"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 
+-- Toggle Menu Button
 local toggleButton = Instance.new("TextButton", screenGui)
 toggleButton.Size = UDim2.new(0, 120, 0, 40)
 toggleButton.Position = UDim2.new(1, -130, 0, 20)
@@ -28,24 +32,40 @@ toggleButton.Font = Enum.Font.GothamBlack
 toggleButton.TextSize = 16
 toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 toggleButton.TextColor3 = Color3.new(1, 1, 1)
-
 Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 10)
 Instance.new("UIStroke", toggleButton).Color = Color3.fromRGB(255, 65, 65)
 
+-- Main Menu
 local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 400, 0, 340)
-mainFrame.Position = UDim2.new(1, -420, 0, 70)
+mainFrame.Size = UDim2.new(0, 420, 0, 360)
+mainFrame.Position = UDim2.new(1, -440, 0, 70)
 mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.Visible = false
-
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
-local mfStroke = Instance.new("UIStroke", mainFrame)
-mfStroke.Color = Color3.fromRGB(255, 0, 0)
-mfStroke.Thickness = 2
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(255, 0, 0)
 
+-- Make Draggable
+local dragging, dragInput, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Sidebar
 local sidebar = Instance.new("Frame", mainFrame)
-sidebar.Size = UDim2.new(0, 150, 1, 0)
-sidebar.Position = UDim2.new(0, 0, 0, 0)
+sidebar.Size = UDim2.new(0, 170, 1, 0)
 sidebar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 Instance.new("UICorner", sidebar).CornerRadius = UDim.new(0, 10)
 
@@ -58,132 +78,199 @@ padding.PaddingTop = UDim.new(0, 10)
 padding.PaddingLeft = UDim.new(0, 10)
 padding.PaddingRight = UDim.new(0, 10)
 
-local function makeButton(name, callback)
-local btn = Instance.new("TextButton", sidebar)
-btn.Size = UDim2.new(1, 0, 0, 32)
-btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-btn.Text = "• " .. name
-btn.Font = Enum.Font.GothamMedium
-btn.TextSize = 14
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.AutoButtonColor = true
-btn.Name = name:gsub(" ", "")
-btn.MouseButton1Click:Connect(callback)
+-- Utility
+local function updateButtonText(button, name, state)
+	button.Text = "• " .. name .. " : " .. (state and "ON" or "OFF")
+end
 
-local corner = Instance.new("UICorner", btn)  
-corner.CornerRadius = UDim.new(0, 6)  
-
-local stroke = Instance.new("UIStroke", btn)  
-stroke.Color = Color3.fromRGB(100, 100, 100)  
-stroke.Thickness = 1
-
+local function randomColor()
+	return Color3.fromRGB(math.random(0,255), math.random(0,255), math.random(0,255))
 end
 
 -- Buttons
-makeButton("Toggle Aimbot FOV", function() AimbotEnabled = not AimbotEnabled end)
-makeButton("Target Head / Body", function() AimPart = AimPart == "Head" and "HumanoidRootPart" or "Head" end)
-makeButton("Toggle ESP / Box", function() ESPEnabled = not ESPEnabled end)
-makeButton("Toggle Line", function() LineEnabled = not LineEnabled end)
+local function makeButton(name, onClick)
+	local btn = Instance.new("TextButton", sidebar)
+	btn.Size = UDim2.new(1, 0, 0, 32)
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	btn.Font = Enum.Font.GothamMedium
+	btn.TextSize = 14
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.AutoButtonColor = true
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	Instance.new("UIStroke", btn).Color = Color3.fromRGB(100, 100, 100)
+	btn.Name = name:gsub(" ", "")
+	onClick(btn)
+	return btn
+end
 
-makeButton("Toggle X-Ray", function()
-XRayEnabled = not XRayEnabled
-for _, part in pairs(Workspace:GetDescendants()) do
-if part:IsA("BasePart") and part.Transparency < 1 then
-part.LocalTransparencyModifier = XRayEnabled and 0.5 or 0
-end
-end
+-- Feature Buttons
+local aimbotBtn = makeButton("Aimbot FOV", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		AimbotEnabled = not AimbotEnabled
+		updateButtonText(btn, "Aimbot FOV", AimbotEnabled)
+	end)
+	updateButtonText(btn, "Aimbot FOV", AimbotEnabled)
 end)
 
-makeButton("Toggle WalkSpeed / Jump", function()
-local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local hum = char:FindFirstChildOfClass("Humanoid")
-if hum then
-hum.WalkSpeed = hum.WalkSpeed == 16 and 50 or 16
-hum.JumpPower = hum.JumpPower == 50 and 100 or 50
-end
+local aimpartBtn = makeButton("Target Head/Body", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		AimPart = AimPart == "Head" and "HumanoidRootPart" or "Head"
+		btn.Text = "• Target: " .. AimPart
+	end)
+	btn.Text = "• Target: " .. AimPart
 end)
 
-makeButton("Toggle Team Check", function() TeamCheck = not TeamCheck end)
+local espBtn = makeButton("ESP / Box", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		ESPEnabled = not ESPEnabled
+		updateButtonText(btn, "ESP / Box", ESPEnabled)
+	end)
+	updateButtonText(btn, "ESP / Box", ESPEnabled)
+end)
+
+local lineBtn = makeButton("Line ESP", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		LineEnabled = not LineEnabled
+		updateButtonText(btn, "Line ESP", LineEnabled)
+	end)
+	updateButtonText(btn, "Line ESP", LineEnabled)
+end)
+
+local xrayBtn = makeButton("X-Ray", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		XRayEnabled = not XRayEnabled
+		for _, p in pairs(Workspace:GetDescendants()) do
+			if p:IsA("BasePart") and p.Transparency < 1 then
+				p.LocalTransparencyModifier = XRayEnabled and 0.5 or 0
+			end
+		end
+		updateButtonText(btn, "X-Ray", XRayEnabled)
+	end)
+	updateButtonText(btn, "X-Ray", XRayEnabled)
+end)
+
+local wsJumpBtn = makeButton("Speed / Jump", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.WalkSpeed = hum.WalkSpeed == 16 and 50 or 16
+			hum.JumpPower = hum.JumpPower == 50 and 100 or 50
+		end
+	end)
+	btn.Text = "• Speed / Jump"
+end)
+
+local teamCheckBtn = makeButton("Team Check", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		TeamCheck = not TeamCheck
+		updateButtonText(btn, "Team Check", TeamCheck)
+	end)
+	updateButtonText(btn, "Team Check", TeamCheck)
+end)
+
+local fovSizeBtn = makeButton("Change FOV Size", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		FOVRadius = FOVRadius == 100 and 200 or 100
+		btn.Text = "• FOV Radius: " .. FOVRadius
+	end)
+	btn.Text = "• FOV Radius: " .. FOVRadius
+end)
+
+local lineTargetBtn = makeButton("Line Target", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		if LineTarget == "Head" then LineTarget = "Torso"
+		elseif LineTarget == "Torso" then LineTarget = "Center"
+		else LineTarget = "Head" end
+		btn.Text = "• Line To: " .. LineTarget
+	end)
+	btn.Text = "• Line To: " .. LineTarget
+end)
+
+local colorBtn = makeButton("Random ESP Color", function(btn)
+	btn.MouseButton1Click:Connect(function()
+		ESPColor = randomColor()
+	end)
+	btn.Text = "• Random ESP Color"
+end)
 
 toggleButton.MouseButton1Click:Connect(function()
-mainFrame.Visible = not mainFrame.Visible
+	mainFrame.Visible = not mainFrame.Visible
 end)
 
--- ESP Functions
-local function createESP(target)
-local box = Drawing.new("Square")
-box.Color = ESPColor
-box.Thickness = 2
-box.Transparency = 1
-box.Filled = false
-
-local line = Drawing.new("Line")  
-line.Color = ESPColor  
-line.Thickness = 2  
-line.Transparency = 1  
-
-return {  
-	box = box,  
-	line = line,  
-	update = function()  
-		local char = target.Character  
-		if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then  
-			local hrp = char.HumanoidRootPart  
-			local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)  
-			if onScreen then  
-				local size = 50  
-				box.Size = Vector2.new(size, size * 1.6)  
-				box.Position = Vector2.new(pos.X - size / 2, pos.Y - size / 1.6)  
-				box.Visible = ESPEnabled  
-
-				line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)  
-				line.To = Vector2.new(pos.X, pos.Y)  
-				line.Visible = LineEnabled  
-			else  
-				box.Visible = false  
-				line.Visible = false  
-			end  
-		else  
-			box.Visible = false  
-			line.Visible = false  
-		end  
-	end  
-}
-
-end
-
+-- ESP + Aimbot
 local espObjects = {}
+local function createESP(target)
+	local box = Drawing.new("Square")
+	box.Color = ESPColor
+	box.Thickness = 2
+	box.Transparency = 1
+	box.Filled = false
 
-local function setupESPForPlayer(player)
-if player == LocalPlayer then return end
-local espObj = createESP(player)
-espObjects[player] = espObj
+	local line = Drawing.new("Line")
+	line.Color = ESPColor
+	line.Thickness = 2
+	line.Transparency = 1
+
+	return {
+		box = box,
+		line = line,
+		update = function()
+			local char = target.Character
+			if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+				local hrp = char.HumanoidRootPart
+				local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+				if onScreen then
+					local size = 50
+					box.Size = Vector2.new(size, size * 1.6)
+					box.Position = Vector2.new(pos.X - size / 2, pos.Y - size / 1.6)
+					box.Color = ESPColor
+					box.Visible = ESPEnabled
+
+					local toPos = (LineTarget == "Head" and char:FindFirstChild("Head") or LineTarget == "Torso" and char:FindFirstChild("HumanoidRootPart") or hrp)
+					local w2v, onScreen2 = Camera:WorldToViewportPoint(toPos.Position)
+					line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+					line.To = Vector2.new(w2v.X, w2v.Y)
+					line.Color = ESPColor
+					line.Visible = LineEnabled
+				else
+					box.Visible = false
+					line.Visible = false
+				end
+			else
+				box.Visible = false
+				line.Visible = false
+			end
+		end
+	}
 end
 
-for _, player in pairs(Players:GetPlayers()) do
-setupESPForPlayer(player)
+local function setupESP(player)
+	if player == LocalPlayer then return end
+	local espObj = createESP(player)
+	espObjects[player] = espObj
 end
 
-Players.PlayerAdded:Connect(setupESPForPlayer)
+for _, p in pairs(Players:GetPlayers()) do setupESP(p) end
+Players.PlayerAdded:Connect(setupESP)
 
--- Aimbot Target Finder
+-- Targeting
 local function getClosest()
-local closest = nil
-local shortest = math.huge
-for _, target in pairs(Players:GetPlayers()) do
-if target ~= LocalPlayer and target.Character and target.Character:FindFirstChild(AimPart) then
-if TeamCheck and target.Team == LocalPlayer.Team then continue end
-local pos, onScreen = Camera:WorldToViewportPoint(target.Character[AimPart].Position)
-if onScreen then
-local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
-if dist < shortest and dist < FOVRadius then
-shortest = dist
-closest = target
-end
-end
-end
-end
-return closest
+	local closest, shortest = nil, math.huge
+	for _, p in pairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(AimPart) then
+			if TeamCheck and p.Team == LocalPlayer.Team then continue end
+			local pos, onScreen = Camera:WorldToViewportPoint(p.Character[AimPart].Position)
+			if onScreen then
+				local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)).Magnitude
+				if dist < shortest and dist < FOVRadius then
+					shortest = dist
+					closest = p
+				end
+			end
+		end
+	end
+	return closest
 end
 
 -- FOV Circle
@@ -197,21 +284,18 @@ fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.
 
 -- Main Loop
 RunService.RenderStepped:Connect(function()
-fovCircle.Visible = AimbotEnabled
-fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	fovCircle.Visible = AimbotEnabled
+	fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	fovCircle.Radius = FOVRadius
 
-for _, espObj in pairs(espObjects) do  
-	espObj.update()  
-end  
+	for _, obj in pairs(espObjects) do obj.update() end
 
-if AimbotEnabled then  
-	local target = getClosest()  
-	if target and target.Character and target.Character:FindFirstChild(AimPart) then  
-		local part = target.Character[AimPart]  
-		local direction = (part.Position - Camera.CFrame.Position).Unit  
-		Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + direction)  
-	end  
-end
-
+	if AimbotEnabled then
+		local target = getClosest()
+		if target and target.Character and target.Character:FindFirstChild(AimPart) then
+			local part = target.Character[AimPart]
+			local dir = (part.Position - Camera.CFrame.Position).Unit
+			Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + dir)
+		end
+	end
 end)
-
