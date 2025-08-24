@@ -56,15 +56,9 @@ for _, feature in pairs(ESPFeatures) do
     ESPSection:AddSlider({ Name = feature.." Size/Thickness", Flag = "ESP_"..feature.."Size", Value = 1, Min = 1, Max = 20, Textbox = true })
 end
 
--- TeamCheck Section (ใหม่ 5 ตัวเลือก)
+-- TeamCheck Section แบบง่าย
 local TeamSection = GeneralTab:CreateSection({ Name = "TeamCheck", Side = "Right" })
 TeamSection:AddToggle({ Name = "Enable TeamCheck", Flag = "ESP_TeamCheck" })
-TeamSection:AddDropdown({
-    Name = "ESP Team Mode",
-    Flag = "ESP_TeamMode",
-    List = {"All","Enemies Only","Allies Only","All Enemies","All Allies"},
-    Value = "Enemies Only"
-})
 
 -- Services
 local RunService = game:GetService("RunService")
@@ -162,16 +156,10 @@ RunService.RenderStepped:Connect(function()
             local esp = CreateESP(player)
             local rootPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
             
-            -- Team Check Logic
+            -- TeamCheck แบบง่าย
             local showESP = true
             if library.flags["ESP_TeamCheck"] then
-                local mode = library.flags["ESP_TeamMode"] or "Enemies Only"
-                if LocalPlayer.Team and player.Team then
-                    if mode=="Enemies Only" and player.Team == LocalPlayer.Team then showESP=false
-                    elseif mode=="Allies Only" and player.Team ~= LocalPlayer.Team then showESP=false
-                    elseif mode=="All Enemies" and player.Team == LocalPlayer.Team then showESP=false
-                    elseif mode=="All Allies" and player.Team ~= LocalPlayer.Team then showESP=false end
-                end
+                showESP = true -- แสดงผู้เล่นคนอื่นทุกคน
             end
             
             if showESP and library.flags["ESP_Enabled"] and onScreen then
