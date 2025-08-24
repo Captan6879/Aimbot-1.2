@@ -1,312 +1,98 @@
+local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Wait = library.subs.Wait
+
+local PepsisWorld = library:CreateWindow({
+    Name = "Teppitakvittaya",
+    Themeable = { Info = "Discord Server: VzYTJ7Y" }
+})
+
+local GeneralTab = PepsisWorld:CreateTab({ Name = "General" })
+
+-- Farming Section
+local FarmingSection = GeneralTab:CreateSection({ Name = "Farming" })
+FarmingSection:AddToggle({ Name = "Aimbot", Flag = "FarmingSection_Aimbot" })
+FarmingSection:AddSlider({ Name = "Aimbot FOV", Flag = "FarmingSection_AimbotFOV", Value = 100, Min = 50, Max = 500, Textbox = true, Format = function(v) return "FOV: "..v end })
+FarmingSection:AddToggle({ Name = "Fov", Flag = "FarmingSection_Fov" })
+FarmingSection:AddSlider({ Name = "Size Fov", Flag = "FarmingSection_SizeFoV", Value = 2, Min = 1, Max = 10, Textbox = true })
+FarmingSection:AddToggle({ Name = "Thinness of the line", Flag = "FarmingSection_Thinnessoftheline" })
+FarmingSection:AddToggle({ Name = "Find Player", Flag = "FarmingSection_FindPlayer" })
+FarmingSection:AddSlider({
+    Name = "Lock Player",
+    Flag = "FarmingSection_LockPlayer",
+    Value = 175, Min = 0, Max = 200, Textbox = true,
+    Format = function(v) return v==0 and "Lock Distance: Infinite" or "Lock Distance: "..v end
+})
+
+-- Settings Section
+local SettingsSection = GeneralTab:CreateSection({ Name = "Settings" })
+SettingsSection:AddToggle({ Name = "Anti Trip/Ragdoll", Flag = "SettingsSection_AntiTripRagdoll" })
+SettingsSection:AddToggle({ Name = "No Wear & Tear", Flag = "SettingsSection_NoWearTear" })
+SettingsSection:AddToggle({ Name = "No Trick Cooldown", Flag = "SettingsSection_NoTrickCooldown" })
+SettingsSection:AddToggle({ Name = "Extend Combo Timout", Flag = "SettingsSection_ExtendComboTimeout" })
+SettingsSection:AddSlider({ Name = "Timeout Extension", Flag = "SettingsSection_TimeoutExtension", Value = 3, Min = 0, Max = 20, Textbox = true, Format = function(v) return v==0 and "Combo Timeout: Never" or "Combo Timeout: "..v.."s" end })
+
+-- Misc Section
+local MiscSection = GeneralTab:CreateSection({ Name = "Misc", Side = "Right" })
+MiscSection:AddToggle({ Name = "Unlock Gamepasses", Flag = "MiscSection_UnlockGamepasses" })
+MiscSection:AddToggle({ Name = "Auto Compete", Flag = "MiscSection_AutoCompete" })
+MiscSection:AddButton({ Name = "Repair Board", Callback = function() print("Fixed") end })
+MiscSection:AddKeybind({ Name = "Test Key", Callback = print })
+MiscSection:AddToggle({ Name = "Test Toggle/Key", Keybind = { Mode = "Dynamic" }, Callback = print })
+
+-- Fun Cosmetics
+local FunSection = GeneralTab:CreateSection({ Name = "Fun Cosmetics" })
+FunSection:AddToggle({ Name = "Ragdoll Assumes Flight", Flag = "FunSection_AssumesFlight" })
+FunSection:AddToggle({ Name = "Ragdoll On Player Collision", Flag = "FunSection_RagdollOnPlayerCollision" })
+FunSection:AddToggle({ Name = "Un-Ragdoll When Motionless", Flag = "FunSection_UnRagdollWhenMotionless" })
+FunSection:AddToggle({ Name = "Extend Ragdoll Duration", Flag = "FunSection_ExtendRagdollDuration" })
+FunSection:AddSlider({ Name = "Ragdoll Extension", Flag = "FunSection_RagdollExtension", Value = 4, Min = 0, Max = 60, Textbox = true, Format = function(v) return v==0 and "Ragdoll Extension: Indefinite" or "Ragdoll Extension: "..v.."s" end })
+
+-- ESP Section
+local ESPSection = GeneralTab:CreateSection({ Name = "ESP" })
+ESPSection:AddToggle({ Name = "Enable ESP", Flag = "ESP_Enabled" })
+local ESPFeatures = {"Box","Name","Health","Distance","Head Dot","Tracer","Skeleton","Highlight","Glow"}
+for _, feature in pairs(ESPFeatures) do
+    ESPSection:AddToggle({ Name = feature, Flag = "ESP_"..feature:gsub(" ","") })
+    ESPSection:AddSlider({ Name = feature.." Size/Thickness", Flag = "ESP_"..feature.."Size", Value = 1, Min = 1, Max = 20, Textbox = true })
+end
+
+-- TeamCheck Section (ใหม่ 5 ตัวเลือก)
+local TeamSection = GeneralTab:CreateSection({ Name = "TeamCheck", Side = "Right" })
+TeamSection:AddToggle({ Name = "Enable TeamCheck", Flag = "ESP_TeamCheck" })
+TeamSection:AddDropdown({
+    Name = "ESP Team Mode",
+    Flag = "ESP_TeamMode",
+    List = {"All","Enemies Only","Allies Only","All Enemies","All Allies"},
+    Value = "Enemies Only"
+})
+
 -- Services
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
+local Camera = workspace.CurrentCamera
 
--- CONFIG
-local ESPColor = Color3.fromRGB(255,0,0)
-local AimbotEnabled = false
-local ESPEnabled = false
-local LineEnabled = false
-local XRayEnabled = false
-local TeamCheck = true
-local AimPart = "Head"
-local FOVRadius = 100
-local LineTarget = "Center"
-local BoxThickness = 2
-local LineThickness = 2
+-- FOV Circle
+local Circle = Drawing.new("Circle")
+Circle.NumSides = 64
+Circle.Filled = false
+Circle.Color = Color3.fromRGB(255,0,0)
+Circle.Transparency = 1
+Circle.Visible = true
 
--- GUI
-local screenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-screenGui.Name = "FuturisticMenu"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-
--- Floating Circle Button
-local toggleButton = Instance.new("TextButton", screenGui)
-toggleButton.Size = UDim2.new(0,60,0,60)
-toggleButton.Position = UDim2.new(1,-80,0,50)
-toggleButton.BackgroundColor3 = Color3.fromRGB(0,255,255)
-toggleButton.Text = "≡"
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 20
-toggleButton.TextColor3 = Color3.fromRGB(0,0,0)
-toggleButton.AutoButtonColor = false
-Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0,30)
-local stroke = Instance.new("UIStroke", toggleButton)
-stroke.Color = Color3.fromRGB(0,200,255)
-stroke.Thickness = 2
-
--- Main Menu Frame
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0,420,0,380)
-mainFrame.Position = UDim2.new(0.5,-210,0.5,-190)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,40)
-mainFrame.BackgroundTransparency = 0.1
-mainFrame.Visible = false
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,16)
-local frameStroke = Instance.new("UIStroke", mainFrame)
-frameStroke.Color = Color3.fromRGB(0,255,255)
-frameStroke.Thickness = 2
-
--- Draggable Main Menu
-local dragging, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.MouseButton1 then
-        dragging=true
-        dragStart=input.Position
-        startPos=mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState==Enum.UserInputState.End then dragging=false end
-        end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        mainFrame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
-    end
-end)
-
--- Sidebar
-local sidebar=Instance.new("Frame",mainFrame)
-sidebar.Size=UDim2.new(0,180,1,0)
-sidebar.BackgroundColor3=Color3.fromRGB(25,25,50)
-sidebar.BackgroundTransparency=0.15
-Instance.new("UICorner",sidebar).CornerRadius=UDim.new(0,12)
-local layout=Instance.new("UIListLayout",sidebar)
-layout.Padding=UDim.new(0,10)
-layout.SortOrder=Enum.SortOrder.LayoutOrder
-local padding=Instance.new("UIPadding",sidebar)
-padding.PaddingTop=UDim.new(0,15)
-padding.PaddingLeft=UDim.new(0,12)
-padding.PaddingRight=UDim.new(0,12)
-
--- UTILITY FUNCTIONS
-local function updateButtonText(button,name,state)
-    button.Text="• "..name.." : "..(state and "ON" or "OFF")
-end
-
-local function randomColor()
-    return Color3.fromRGB(math.random(0,255),math.random(0,255),math.random(0,255))
-end
-
--- CREATE BUTTON
-local function makeButton(name,onClick)
-    local btn=Instance.new("TextButton",sidebar)
-    btn.Size=UDim2.new(1,0,0,36)
-    btn.BackgroundColor3=Color3.fromRGB(30,30,60)
-    btn.BackgroundTransparency=0.25
-    btn.Font=Enum.Font.GothamSemibold
-    btn.TextSize=15
-    btn.TextColor3=Color3.fromRGB(170,255,255)
-    btn.AutoButtonColor=false
-    Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
-    local stroke=Instance.new("UIStroke",btn)
-    stroke.Color=Color3.fromRGB(0,200,255)
-    stroke.Thickness=1.5
-    btn.Name=name:gsub(" ","")
-    onClick(btn)
-    return btn
-end
-
--- CREATE INPUT BOX
-local function makeInput(name,defaultValue,onChange)
-    local box=Instance.new("TextBox",sidebar)
-    box.Size=UDim2.new(1,0,0,36)
-    box.BackgroundColor3=Color3.fromRGB(25,25,50)
-    box.BackgroundTransparency=0.2
-    box.Font=Enum.Font.GothamSemibold
-    box.TextSize=15
-    box.TextColor3=Color3.fromRGB(0,255,255)
-    box.Text=tostring(defaultValue)
-    box.PlaceholderText=name
-    box.ClearTextOnFocus=false
-    Instance.new("UICorner",box).CornerRadius=UDim.new(0,8)
-    local stroke=Instance.new("UIStroke",box)
-    stroke.Color=Color3.fromRGB(0,200,255)
-    stroke.Thickness=1.5
-    box.FocusLost:Connect(function()
-        local num=tonumber(box.Text)
-        if num then onChange(num) else box.Text=tostring(defaultValue) end
-    end)
-end
-
--- Toggle Main Menu
-toggleButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible=not mainFrame.Visible
-end)
-
--- FEATURE BUTTONS
-local aimbotBtn=makeButton("Aimbot FOV",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        AimbotEnabled=not AimbotEnabled
-        updateButtonText(btn,"Aimbot FOV",AimbotEnabled)
-    end)
-    updateButtonText(btn,"Aimbot FOV",AimbotEnabled)
-end)
-
-local aimpartBtn=makeButton("Target Head/Body",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        AimPart=AimPart=="Head" and "HumanoidRootPart" or "Head"
-        btn.Text="• Target: "..AimPart
-    end)
-    btn.Text="• Target: "..AimPart
-end)
-
-local espBtn=makeButton("ESP / Box",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        ESPEnabled=not ESPEnabled
-        updateButtonText(btn,"ESP / Box",ESPEnabled)
-    end)
-    updateButtonText(btn,"ESP / Box",ESPEnabled)
-end)
-
-local lineBtn=makeButton("Line ESP",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        LineEnabled=not LineEnabled
-        updateButtonText(btn,"Line ESP",LineEnabled)
-    end)
-    updateButtonText(btn,"Line ESP",LineEnabled)
-end)
-
-local xrayBtn=makeButton("X-Ray",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        XRayEnabled=not XRayEnabled
-        for _,p in pairs(Workspace:GetDescendants()) do
-            if p:IsA("BasePart") and p.Transparency<1 then
-                p.LocalTransparencyModifier=XRayEnabled and 0.5 or 0
-            end
-        end
-        updateButtonText(btn,"X-Ray",XRayEnabled)
-    end)
-    updateButtonText(btn,"X-Ray",XRayEnabled)
-end)
-
-local wsJumpBtn=makeButton("Speed / Jump",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hum=char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed=hum.WalkSpeed==16 and 50 or 16
-            hum.JumpPower=hum.JumpPower==50 and 100 or 50
-        end
-    end)
-    btn.Text="• Speed / Jump"
-end)
-
-local teamCheckBtn=makeButton("Team Check",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        TeamCheck=not TeamCheck
-        updateButtonText(btn,"Team Check",TeamCheck)
-    end)
-    updateButtonText(btn,"Team Check",TeamCheck)
-end)
-
-local fovSizeInput=makeInput("FOV Radius",FOVRadius,function(val) FOVRadius=val end)
-local boxThicknessInput=makeInput("Box Thickness",BoxThickness,function(val) BoxThickness=val end)
-local lineThicknessInput=makeInput("Line Thickness",LineThickness,function(val) LineThickness=val end)
-
-local colorBtn=makeButton("Random ESP Color",function(btn)
-    btn.MouseButton1Click:Connect(function()
-        ESPColor=randomColor()
-    end)
-    btn.Text="• Random ESP Color"
-end)
-
--- ESP OBJECTS
-local espObjects = {}
-
-local function createESP(target)
-    local box = Drawing.new("Square")
-    box.Color = ESPColor
-    box.Thickness = BoxThickness
-    box.Transparency = 1
-    box.Filled = false
-
-    local line = Drawing.new("Line")
-    line.Color = ESPColor
-    line.Thickness = LineThickness
-    line.Transparency = 1
-
-    local healthBar = Drawing.new("Line")
-    healthBar.Color = Color3.fromRGB(0,255,0)
-    healthBar.Thickness = 4
-    healthBar.Transparency = 1
-
-    return {
-        box = box,
-        line = line,
-        healthBar = healthBar,
-        update = function()
-            local char = target.Character
-            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-                local hrp = char.HumanoidRootPart
-                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-                if onScreen then
-                    local size = 50
-                    box.Size = Vector2.new(size, size * 1.6)
-                    box.Position = Vector2.new(pos.X - size / 2, pos.Y - size / 1.6)
-                    box.Color = ESPColor
-                    box.Thickness = BoxThickness
-                    box.Visible = ESPEnabled
-
-                    local toPos = (LineTarget == "Head" and char:FindFirstChild("Head") or LineTarget == "Torso" and char:FindFirstChild("HumanoidRootPart") or hrp)
-                    local w2v, onScreen2 = Camera:WorldToViewportPoint(toPos.Position)
-                    line.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                    line.To = Vector2.new(w2v.X, w2v.Y)
-                    line.Color = ESPColor
-                    line.Thickness = LineThickness
-                    line.Visible = LineEnabled
-
-                    -- Health Bar
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        local healthPercent = hum.Health / hum.MaxHealth
-                        healthBar.From = Vector2.new(pos.X - size/2, pos.Y - size/1.6 - 10)
-                        healthBar.To = Vector2.new(pos.X - size/2 + size * healthPercent, pos.Y - size/1.6 - 10)
-                        healthBar.Visible = ESPEnabled
-                    else
-                        healthBar.Visible = false
+local function GetClosestPlayer(FOV, distanceLimit)
+    local closest, dist = nil, math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local pos, visible = Camera:WorldToViewportPoint(player.Character.Head.Position)
+            if visible then
+                local magnitude = (Vector2.new(pos.X,pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).magnitude
+                if magnitude < FOV and magnitude < dist then
+                    local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    if distanceLimit == 0 or distance < distanceLimit then
+                        closest = player
+                        dist = magnitude
                     end
-                else
-                    box.Visible=false
-                    line.Visible=false
-                    healthBar.Visible=false
-                end
-            else
-                box.Visible=false
-                line.Visible=false
-                healthBar.Visible=false
-            end
-        end
-    }
-end
-
-local function setupESP(player)
-    if player == LocalPlayer then return end
-    local espObj = createESP(player)
-    espObjects[player] = espObj
-end
-
-for _,p in pairs(Players:GetPlayers()) do setupESP(p) end
-Players.PlayerAdded:Connect(setupESP)
-
--- TARGETING FUNCTION
-local function getClosest()
-    local closest, shortest = nil, math.huge
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(AimPart) then
-            if TeamCheck and p.Team == LocalPlayer.Team then continue end
-            local pos, onScreen = Camera:WorldToViewportPoint(p.Character[AimPart].Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X,pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                if dist < shortest and dist < FOVRadius then
-                    shortest = dist
-                    closest = p
                 end
             end
         end
@@ -314,29 +100,126 @@ local function getClosest()
     return closest
 end
 
--- FOV Circle
-local fovCircle = Drawing.new("Circle")
-fovCircle.Color = Color3.fromRGB(255,0,0)
-fovCircle.Thickness = 2
-fovCircle.Transparency = 1
-fovCircle.Filled = false
-fovCircle.Radius = FOVRadius
-fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+-- Dynamic ESP
+local ESPPlayers = {}
+local function CreateESP(player)
+    if ESPPlayers[player] then return ESPPlayers[player] end
+    local esp = {}
+    esp.Box = Drawing.new("Square"); esp.Box.Filled=false; esp.Box.Color=Color3.fromRGB(255,0,0)
+    esp.Name = Drawing.new("Text"); esp.Name.Center=true; esp.Name.Color=Color3.fromRGB(255,255,255); esp.Name.Outline=true
+    esp.Health = Drawing.new("Text"); esp.Health.Center=true; esp.Health.Color=Color3.fromRGB(0,255,0); esp.Health.Outline=true
+    esp.Distance = Drawing.new("Text"); esp.Distance.Center=true; esp.Distance.Color=Color3.fromRGB(255,255,0); esp.Distance.Outline=true
+    esp.HeadDot = Drawing.new("Circle"); esp.HeadDot.Filled=true; esp.HeadDot.Color=Color3.fromRGB(255,0,0)
+    esp.Tracer = Drawing.new("Line"); esp.Tracer.Color=Color3.fromRGB(255,255,255)
+    ESPPlayers[player] = esp
+    return esp
+end
 
--- MAIN LOOP
+Players.PlayerRemoving:Connect(function(player)
+    local esp = ESPPlayers[player]
+    if esp then
+        for _, v in pairs(esp) do if v and v.Visible ~= nil then v.Visible=false end end
+        ESPPlayers[player] = nil
+    end
+end)
+
+-- UI Toggle Button (Right-Top)
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+local ToggleButton = Instance.new("TextButton", ScreenGui)
+ToggleButton.Size = UDim2.new(0,100,0,40)
+ToggleButton.Position = UDim2.new(1,-110,0,10)
+ToggleButton.Text = "Toggle"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(30,30,30)
+ToggleButton.TextColor3 = Color3.fromRGB(255,255,255)
+ToggleButton.TextScaled = true
+ToggleButton.BorderSizePixel = 0
+local menuVisible = true
+ToggleButton.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    PepsisWorld.MainFrame.Visible = menuVisible
+end)
+
+-- Main Render Loop
 RunService.RenderStepped:Connect(function()
-    fovCircle.Visible = AimbotEnabled
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    fovCircle.Radius = FOVRadius
+    -- FOV Circle
+    Circle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    Circle.Radius = library.flags["FarmingSection_AimbotFOV"] or 100
+    Circle.Thickness = library.flags["FarmingSection_SizeFoV"] or 2
+    Circle.Visible = library.flags["FarmingSection_Fov"] or false
 
-    for _, obj in pairs(espObjects) do obj.update() end
+    -- Aimbot
+    if library.flags["FarmingSection_Aimbot"] then
+        local target = GetClosestPlayer(Circle.Radius, library.flags["FarmingSection_LockPlayer"] or 0)
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+            if library.flags["FarmingSection_FindPlayer"] then print("Locked on:", target.Name) end
+        end
+    end
 
-    if AimbotEnabled then
-        local target = getClosest()
-        if target and target.Character and target.Character:FindFirstChild(AimPart) then
-            local part = target.Character[AimPart]
-            local dir = (part.Position - Camera.CFrame.Position).Unit
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + dir)
+    -- ESP
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local esp = CreateESP(player)
+            local rootPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            
+            -- Team Check Logic
+            local showESP = true
+            if library.flags["ESP_TeamCheck"] then
+                local mode = library.flags["ESP_TeamMode"] or "Enemies Only"
+                if LocalPlayer.Team and player.Team then
+                    if mode=="Enemies Only" and player.Team == LocalPlayer.Team then showESP=false
+                    elseif mode=="Allies Only" and player.Team ~= LocalPlayer.Team then showESP=false
+                    elseif mode=="All Enemies" and player.Team == LocalPlayer.Team then showESP=false
+                    elseif mode=="All Allies" and player.Team ~= LocalPlayer.Team then showESP=false end
+                end
+            end
+            
+            if showESP and library.flags["ESP_Enabled"] and onScreen then
+                -- Box
+                if library.flags["ESP_Box"] then
+                    esp.Box.Position = Vector2.new(rootPos.X-25, rootPos.Y-40)
+                    esp.Box.Size = Vector2.new(50,80)
+                    esp.Box.Thickness = library.flags["ESP_BoxSize"] or 1
+                    esp.Box.Visible = true
+                else esp.Box.Visible=false end
+                -- Name
+                if library.flags["ESP_Name"] then
+                    esp.Name.Text = player.Name
+                    esp.Name.Position = Vector2.new(rootPos.X, rootPos.Y-50)
+                    esp.Name.Size = library.flags["ESP_NameSize"] or 16
+                    esp.Name.Visible = true
+                else esp.Name.Visible=false end
+                -- Health
+                if library.flags["ESP_Health"] and player.Character:FindFirstChild("Humanoid") then
+                    esp.Health.Text = "HP:"..math.floor(player.Character.Humanoid.Health)
+                    esp.Health.Position = Vector2.new(rootPos.X, rootPos.Y+45)
+                    esp.Health.Size = library.flags["ESP_HealthSize"] or 14
+                    esp.Health.Visible = true
+                else esp.Health.Visible=false end
+                -- Distance
+                if library.flags["ESP_Distance"] then
+                    esp.Distance.Text = "Dist:"..math.floor((LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude)
+                    esp.Distance.Position = Vector2.new(rootPos.X, rootPos.Y+60)
+                    esp.Distance.Size = library.flags["ESP_DistanceSize"] or 14
+                    esp.Distance.Visible = true
+                else esp.Distance.Visible=false end
+                -- Head Dot
+                if library.flags["ESP_HeadDot"] and player.Character:FindFirstChild("Head") then
+                    local headPos = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                    esp.HeadDot.Position = Vector2.new(headPos.X, headPos.Y)
+                    esp.HeadDot.Radius = library.flags["ESP_HeadDotSize"] or 4
+                    esp.HeadDot.Visible = true
+                else esp.HeadDot.Visible=false end
+                -- Tracer
+                if library.flags["ESP_Tracer"] then
+                    esp.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                    esp.Tracer.To = Vector2.new(rootPos.X, rootPos.Y)
+                    esp.Tracer.Thickness = library.flags["ESP_TracerSize"] or 1
+                    esp.Tracer.Visible = true
+                else esp.Tracer.Visible=false end
+            else
+                for _, v in pairs(esp) do if v and v.Visible~=nil then v.Visible=false end end
+            end
         end
     end
 end)
