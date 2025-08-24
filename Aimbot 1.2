@@ -1,3 +1,4 @@
+-- ==================== Library & Setup ==================== --
 local library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
 local Wait = library.subs.Wait
 
@@ -6,15 +7,20 @@ local PepsisWorld = library:CreateWindow({
     Themeable = { Info = "Discord Server: VzYTJ7Y" }
 })
 
-local GeneralTab = PepsisWorld:CreateTab({ Name = "General" })
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
 
--- Farming Section
+-- ==================== Tabs & Sections ==================== --
+local GeneralTab = PepsisWorld:CreateTab({ Name = "General" })
 local FarmingSection = GeneralTab:CreateSection({ Name = "Farming" })
 FarmingSection:AddToggle({ Name = "Aimbot", Flag = "FarmingSection_Aimbot" })
 FarmingSection:AddSlider({ Name = "Aimbot FOV", Flag = "FarmingSection_AimbotFOV", Value = 100, Min = 50, Max = 500, Textbox = true, Format = function(v) return "FOV: "..v end })
 FarmingSection:AddToggle({ Name = "Fov", Flag = "FarmingSection_Fov" })
 FarmingSection:AddSlider({ Name = "Size Fov", Flag = "FarmingSection_SizeFoV", Value = 2, Min = 1, Max = 10, Textbox = true })
-FarmingSection:AddToggle({ Name = "Thinness of the line", Flag = "FarmingSection_Thinnessoftheline" })
 FarmingSection:AddToggle({ Name = "Find Player", Flag = "FarmingSection_FindPlayer" })
 FarmingSection:AddSlider({
     Name = "Lock Player",
@@ -23,7 +29,6 @@ FarmingSection:AddSlider({
     Format = function(v) return v==0 and "Lock Distance: Infinite" or "Lock Distance: "..v end
 })
 
--- Settings Section
 local SettingsSection = GeneralTab:CreateSection({ Name = "Settings" })
 SettingsSection:AddToggle({ Name = "Anti Trip/Ragdoll", Flag = "SettingsSection_AntiTripRagdoll" })
 SettingsSection:AddToggle({ Name = "No Wear & Tear", Flag = "SettingsSection_NoWearTear" })
@@ -31,13 +36,9 @@ SettingsSection:AddToggle({ Name = "No Trick Cooldown", Flag = "SettingsSection_
 SettingsSection:AddToggle({ Name = "Extend Combo Timout", Flag = "SettingsSection_ExtendComboTimeout" })
 SettingsSection:AddSlider({ Name = "Timeout Extension", Flag = "SettingsSection_TimeoutExtension", Value = 3, Min = 0, Max = 20, Textbox = true, Format = function(v) return v==0 and "Combo Timeout: Never" or "Combo Timeout: "..v.."s" end })
 
--- Misc Section
 local MiscSection = GeneralTab:CreateSection({ Name = "Misc", Side = "Right" })
 MiscSection:AddToggle({ Name = "Unlock Gamepasses", Flag = "MiscSection_UnlockGamepasses" })
 MiscSection:AddToggle({ Name = "Auto Compete", Flag = "MiscSection_AutoCompete" })
-MiscSection:AddButton({ Name = "Repair Board", Callback = function() print("Fixed") end })
-MiscSection:AddKeybind({ Name = "Test Key", Callback = print })
-MiscSection:AddToggle({ Name = "Test Toggle/Key", Keybind = { Mode = "Dynamic" }, Callback = print })
 
 -- Fun Cosmetics
 local FunSection = GeneralTab:CreateSection({ Name = "Fun Cosmetics" })
@@ -56,17 +57,27 @@ for _, feature in pairs(ESPFeatures) do
     ESPSection:AddSlider({ Name = feature.." Size/Thickness", Flag = "ESP_"..feature.."Size", Value = 1, Min = 1, Max = 20, Textbox = true })
 end
 
--- TeamCheck Section แบบง่าย
 local TeamSection = GeneralTab:CreateSection({ Name = "TeamCheck", Side = "Right" })
 TeamSection:AddToggle({ Name = "Enable TeamCheck", Flag = "ESP_TeamCheck" })
 
--- Services
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+-- ==================== Player Mods Tab ==================== --
+local PlayerTab = PepsisWorld:CreateTab({ Name = "Player Mods" })
+local PlayerModsSection = PlayerTab:CreateSection({ Name = "Player Mods" })
+PlayerModsSection:AddSlider({ Name = "WalkSpeed", Flag = "PlayerMods_WalkSpeed", Value = 16, Min = 16, Max = 500, Textbox = true, Format = function(v) return "Speed: "..v end })
+PlayerModsSection:AddSlider({ Name = "JumpPower", Flag = "PlayerMods_JumpPower", Value = 50, Min = 50, Max = 500, Textbox = true, Format = function(v) return "Jump: "..v end })
+PlayerModsSection:AddToggle({ Name = "NoClip", Flag = "PlayerMods_NoClip" })
+PlayerModsSection:AddToggle({ Name = "Fly", Flag = "PlayerMods_Fly" })
+PlayerModsSection:AddToggle({ Name = "InfiniteJump", Flag = "PlayerMods_InfiniteJump" })
+PlayerModsSection:AddToggle({ Name = "FullBright", Flag = "PlayerMods_FullBright" })
 
--- FOV Circle
+-- Threat ESP
+local ThreatSection = PlayerTab:CreateSection({ Name = "Threat ESP" })
+ThreatSection:AddToggle({ Name = "Enable Threat ESP", Flag = "Threat_Enabled" })
+ThreatSection:AddSlider({ Name = "Marker Size", Flag = "Threat_Size", Value = 2, Min = 1, Max = 10, Textbox = true })
+ThreatSection:AddToggle({ Name = "Show Threat Health", Flag = "Threat_Health" })
+ThreatSection:AddToggle({ Name = "Show Threat Distance", Flag = "Threat_Distance" })
+
+-- ==================== Services ==================== --
 local Circle = Drawing.new("Circle")
 Circle.NumSides = 64
 Circle.Filled = false
@@ -74,28 +85,9 @@ Circle.Color = Color3.fromRGB(255,0,0)
 Circle.Transparency = 1
 Circle.Visible = true
 
-local function GetClosestPlayer(FOV, distanceLimit)
-    local closest, dist = nil, math.huge
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local pos, visible = Camera:WorldToViewportPoint(player.Character.Head.Position)
-            if visible then
-                local magnitude = (Vector2.new(pos.X,pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).magnitude
-                if magnitude < FOV and magnitude < dist then
-                    local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                    if distanceLimit == 0 or distance < distanceLimit then
-                        closest = player
-                        dist = magnitude
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
--- Dynamic ESP
 local ESPPlayers = {}
+local ThreatMarkers = {}
+
 local function CreateESP(player)
     if ESPPlayers[player] then return ESPPlayers[player] end
     local esp = {}
@@ -109,15 +101,25 @@ local function CreateESP(player)
     return esp
 end
 
-Players.PlayerRemoving:Connect(function(player)
-    local esp = ESPPlayers[player]
-    if esp then
-        for _, v in pairs(esp) do if v and v.Visible ~= nil then v.Visible=false end end
-        ESPPlayers[player] = nil
+local function ClearThreatMarkers(player)
+    local markers = ThreatMarkers[player]
+    if markers then
+        for _, m in pairs(markers) do
+            if m and m.Visible ~= nil then m.Visible = false end
+        end
+        ThreatMarkers[player] = nil
     end
+end
+
+Players.PlayerRemoving:Connect(function(player)
+    if ESPPlayers[player] then
+        for _, v in pairs(ESPPlayers[player]) do if v.Visible ~= nil then v.Visible=false end end
+        ESPPlayers[player]=nil
+    end
+    ClearThreatMarkers(player)
 end)
 
--- UI Toggle Button (Right-Top)
+-- ==================== UI Toggle Button ==================== --
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 local ToggleButton = Instance.new("TextButton", ScreenGui)
 ToggleButton.Size = UDim2.new(0,100,0,40)
@@ -133,72 +135,96 @@ ToggleButton.MouseButton1Click:Connect(function()
     PepsisWorld.MainFrame.Visible = menuVisible
 end)
 
--- Main Render Loop
+-- ==================== Render Loop ==================== --
 RunService.RenderStepped:Connect(function()
+    local Character = LocalPlayer.Character
+    if not Character then return end
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Character:FindFirstChild("HumanoidRootPart")
+    if not Humanoid or not RootPart then return end
+
+    -- FullBright
+    if library.flags["PlayerMods_FullBright"] then
+        Lighting.Ambient = Color3.new(1,1,1)
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+    end
+
     -- FOV Circle
     Circle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     Circle.Radius = library.flags["FarmingSection_AimbotFOV"] or 100
     Circle.Thickness = library.flags["FarmingSection_SizeFoV"] or 2
     Circle.Visible = library.flags["FarmingSection_Fov"] or false
 
-    -- Aimbot
+    -- Aimbot Logic
     if library.flags["FarmingSection_Aimbot"] then
-        local target = GetClosestPlayer(Circle.Radius, library.flags["FarmingSection_LockPlayer"] or 0)
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
-            if library.flags["FarmingSection_FindPlayer"] then print("Locked on:", target.Name) end
+        local closest, dist = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+                if library.flags["ESP_TeamCheck"] and LocalPlayer.Team and player.Team == LocalPlayer.Team then continue end
+                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                if onScreen then
+                    local magnitude = (Vector2.new(pos.X,pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).magnitude
+                    if magnitude < Circle.Radius and magnitude < dist then
+                        local distance = (RootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                        if (library.flags["FarmingSection_LockPlayer"] or 0)==0 or distance<(library.flags["FarmingSection_LockPlayer"] or 0) then
+                            closest = player
+                            dist = magnitude
+                        end
+                    end
+                end
+            end
+        end
+        if closest then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, closest.Character.Head.Position)
+            if library.flags["FarmingSection_FindPlayer"] then print("Locked on:", closest.Name) end
         end
     end
 
-    -- ESP
+    -- ESP Logic
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local esp = CreateESP(player)
             local rootPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            
-            -- TeamCheck แบบง่าย
-            local showESP = true
-            if library.flags["ESP_TeamCheck"] then
-                showESP = true -- แสดงผู้เล่นคนอื่นทุกคน
-            end
-            
-            if showESP and library.flags["ESP_Enabled"] and onScreen then
-                -- Box
+            local showESP = library.flags["ESP_Enabled"] and onScreen
+            if library.flags["ESP_TeamCheck"] and LocalPlayer.Team and player.Team == LocalPlayer.Team then showESP=false end
+
+            if showESP then
                 if library.flags["ESP_Box"] then
                     esp.Box.Position = Vector2.new(rootPos.X-25, rootPos.Y-40)
                     esp.Box.Size = Vector2.new(50,80)
                     esp.Box.Thickness = library.flags["ESP_BoxSize"] or 1
                     esp.Box.Visible = true
                 else esp.Box.Visible=false end
-                -- Name
+
                 if library.flags["ESP_Name"] then
                     esp.Name.Text = player.Name
                     esp.Name.Position = Vector2.new(rootPos.X, rootPos.Y-50)
                     esp.Name.Size = library.flags["ESP_NameSize"] or 16
                     esp.Name.Visible = true
                 else esp.Name.Visible=false end
-                -- Health
+
                 if library.flags["ESP_Health"] and player.Character:FindFirstChild("Humanoid") then
                     esp.Health.Text = "HP:"..math.floor(player.Character.Humanoid.Health)
                     esp.Health.Position = Vector2.new(rootPos.X, rootPos.Y+45)
                     esp.Health.Size = library.flags["ESP_HealthSize"] or 14
                     esp.Health.Visible = true
                 else esp.Health.Visible=false end
-                -- Distance
+
                 if library.flags["ESP_Distance"] then
-                    esp.Distance.Text = "Dist:"..math.floor((LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude)
+                    esp.Distance.Text = "Dist:"..math.floor((RootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude)
                     esp.Distance.Position = Vector2.new(rootPos.X, rootPos.Y+60)
                     esp.Distance.Size = library.flags["ESP_DistanceSize"] or 14
                     esp.Distance.Visible = true
                 else esp.Distance.Visible=false end
-                -- Head Dot
-                if library.flags["ESP_HeadDot"] and player.Character:FindFirstChild("Head") then
+
+                if library.flags["ESP_HeadDot"] then
                     local headPos = Camera:WorldToViewportPoint(player.Character.Head.Position)
                     esp.HeadDot.Position = Vector2.new(headPos.X, headPos.Y)
                     esp.HeadDot.Radius = library.flags["ESP_HeadDotSize"] or 4
                     esp.HeadDot.Visible = true
                 else esp.HeadDot.Visible=false end
-                -- Tracer
+
                 if library.flags["ESP_Tracer"] then
                     esp.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
                     esp.Tracer.To = Vector2.new(rootPos.X, rootPos.Y)
@@ -206,8 +232,31 @@ RunService.RenderStepped:Connect(function()
                     esp.Tracer.Visible = true
                 else esp.Tracer.Visible=false end
             else
-                for _, v in pairs(esp) do if v and v.Visible~=nil then v.Visible=false end end
+                for _, v in pairs(esp) do if v and v.Visible ~= nil then v.Visible=false end end
             end
+        end
+    end
+
+    -- Player Mods
+    if Humanoid and RootPart then
+        if library.flags["PlayerMods_WalkSpeed"] then Humanoid.WalkSpeed = library.flags["PlayerMods_WalkSpeed"] end
+        if library.flags["PlayerMods_JumpPower"] then Humanoid.JumpPower = library.flags["PlayerMods_JumpPower"] end
+        if library.flags["PlayerMods_InfiniteJump"] then Humanoid.JumpHeight = math.huge end
+        if library.flags["PlayerMods_NoClip"] then
+            for _, part in pairs(Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide=false end
+            end
+        end
+    end
+end)
+
+-- InfiniteJump Input
+UserInputService.JumpRequest:Connect(function()
+    if library.flags["PlayerMods_InfiniteJump"] then
+        local Character = LocalPlayer.Character
+        if Character then
+            local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+            if Humanoid then Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
         end
     end
 end)
